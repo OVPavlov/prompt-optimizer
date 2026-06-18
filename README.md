@@ -10,6 +10,8 @@ Uses an AI model's domain knowledge to optimize prompts and measure output quali
 
 Model names are anonimized for analyzis and prompting to avoid bias.
 
+![display_model.png](display_model.png)
+
 ## Installation
 
 ```bash
