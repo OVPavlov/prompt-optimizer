@@ -1,0 +1,33 @@
+{no_fluff}
+## Task
+{task_description}
+
+## Rating schema
+{schema_design}
+
+## Evaluation guidance
+{analysis_guidance}
+
+## Output rules
+You will receive a set of (data, output) pairs from one model in one iteration.
+You will analyze all the outputs and produce analysis and rating for all outputs as a whole, not for each output separately.
+You have to produce one rating JSON for all outputs as a whole, summing it up.
+If there's any failure in bools in any of the outputs, the rating for this bool should be False.
+
+For <analysis>:
+- briefly describe what the outputs did and did not accomplish.
+- suggest prompt changes only if it's clear what could be improved.
+- analysis should be brief.
+
+For <rating>:
+- valid JSON containing exactly the schema fields above.
+- No markdown fences, no comments, no trailing commas.
+- Score every field for overall performance, even if outputs are very bad.
+
+Your response must use this exact structure:
+<analysis>
+[prose]
+</analysis>
+<rating>
+[JSON object]
+</rating>

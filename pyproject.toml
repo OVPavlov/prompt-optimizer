@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prompt-optimizer"
+version = "0.1.0"
+description = "Closed-loop prompt optimization across one or more language models."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "openai>=1",
+    "pandas>=2",
+    "python-dotenv>=1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"prompt_optimizer.templates" = ["*.txt", "*.xml"]

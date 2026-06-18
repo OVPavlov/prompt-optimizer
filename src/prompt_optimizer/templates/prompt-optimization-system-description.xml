@@ -1,0 +1,44 @@
+<Prompt_ptimization_system_description>
+  <overview>
+    Closed-loop prompt optimizer. Runs executor LLMs on data, measures output quality via an analyzer LLM,
+    uses a generator LLM to rewrite the prompt. Repeats, accumulating history the generator uses to improve.
+  </overview>
+
+  <roles>
+    <role id="executor" runs="per_model_per_data_item">
+      Receives specialized system prompt (task + injected per_model_instructions) and one filled user message.
+      Produces one output string per data item. Only thing the loop optimizes.
+    </role>
+
+    <role id="analyzer" runs="per_model_per_iteration">
+      Receives all (data, output) pairs for one model in one iteration.
+      Produces analysis prose and a rating dict (bools + floats) with stable schema across all iterations.
+      Must not suggest prompt improvements — measurement only.
+      Must produce one analysis and one rating from overall performance, not for each (data, output) pair.
+    </role>
+
+    <role id="prompt_generator" runs="per_iteration">
+      Receives full anonymized history: all past prompts, per-model instructions, analyses, ratings.
+      Does not see raw data or raw outputs.
+      Produces next system_prompt, user_prompt, and optional per-model instructions.
+    </role>
+  </roles>
+
+  <loop>
+    <step order="1">execute: for each model × each data item, call executor, collect DataOutputs</step>
+    <step order="2">analyze: for each model, call analyzer on its DataOutputs, store analysis + rating</step>
+    <step order="3">generate: call prompt_generator on full anonymized history, get next Prompt</step>
+    <step order="4">repeat from step 1 until all bools True and floats satisfactory</step>
+  </loop>
+
+  <prompt_structure>
+    <field name="system">
+      System prompt template. Contains literal {per_model_instructions} slot where per-model instructions
+      are injected at runtime. Shared across all models before injection.
+    </field>
+    <field name="instructions">
+      Dict mapping model name to instruction string. Injected into {per_model_instructions} in system prompt.
+      Optional — omit when no model-specific behavior is needed.
+    </field>
+  </prompt_structure>
+</Prompt_ptimization_system_description>

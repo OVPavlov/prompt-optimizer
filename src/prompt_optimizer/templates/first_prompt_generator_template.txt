@@ -1,0 +1,25 @@
+{no_fluff}
+
+You are optimizing a prompt for an executor LLM performing the following task:
+
+<task_description>
+{task_description}
+</task_description>
+
+The executor's output must conform to this format:
+
+{generation_guidance}
+
+---
+
+Produce executor prompt to achieve the task.
+
+**Prompt hygiene:** Prefer clarity over added constraints.
+	- Once a problem is resolved, remove the constraint that fixed it. Accumulated rules make prompts brittle.
+
+**Strictly follow formatting rules.**
+
+Output exactly this tag:
+<system_prompt>
+Executor system prompt.
+</system_prompt>

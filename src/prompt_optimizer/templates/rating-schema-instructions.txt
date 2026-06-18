@@ -1,0 +1,55 @@
+## Instructions for Rating Schema Design
+
+---
+Read the task description.
+- Design must come from the task description, not make it up.
+- Use your domain knowledge to understand the task better.
+Work through the following reasoning before producing output.
+
+
+**1. What does correct output look like?**
+
+From the task description, determine: what is the executor asked to produce?
+What would make an output wrong?
+Consider what the task requires logically, structurally, and content-wise.
+Use domain knowledge to surface implied requirements the task description doesn't state explicitly, but only where genuinely implied — not to add requirements that seem reasonable in general.
+
+**2. Separate hard requirements from quality dimensions**
+
+For each requirement you identified, ask two questions:
+
+- *Can a coherent output fail this entirely?* → bool candidate. These are properties that are either satisfied or not — presence of required content, logical validity, format compliance, factual correctness where checkable.
+- *Do correct outputs vary in this dimension?* → float candidate. These are properties that exist on a spectrum among outputs that are already correct.
+
+If a property fails both tests — either it's always satisfied by any coherent output, or it can't be assessed from the output alone — discard it.
+
+**3. Verify each candidate is scorable from the output alone**
+
+The analyzer sees only the executor's output and the data item. Discard any field that requires knowledge not present in those two things.
+Discard any field that measures presentation rather than correctness or quality, unless the task explicitly requires a specific presentation.
+
+**4. Minimize**
+
+If two fields measure the same underlying property, merge them.
+Prefer the smallest set of fields that fully characterizes what "correct" and "good" mean for this task.
+
+---
+
+Now produce the three artifacts:
+
+**`<schema_design>`** — For each field: name in `snake_case`, type (`bool` or `float`), one sentence on what it measures, one sentence on what constitutes `True`/`1.0` and what constitutes `False`/`0.0`.
+
+**`<analysis_guidance>`** — For each field, describe what specific observable evidence in the output determines the score. Be concrete — reference the kind of content the analyzer should look for, not general principles. All schema fields must be scored on every evaluation. Do not suggest prompt improvements or speculate about causes — describe only what is present in the output.
+
+**`<generation_guidance>`** — State the priority rule: failing bools indicate structural incorrectness and must be resolved before float optimization has meaning. For each field, describe what a low score or False value implies about the prompt and what direction of change would address it, grounded in this specific task and schema.
+
+---
+
+Output only:
+```
+<schema_design>...</schema_design>
+<analysis_guidance>...</analysis_guidance>
+<generation_guidance>...</generation_guidance>
+```
+
+Don't hallucinate. Reason thoroughly.
