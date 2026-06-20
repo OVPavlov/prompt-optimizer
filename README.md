@@ -9,9 +9,9 @@ Uses an AI model's domain knowledge to optimize prompts and measure output quali
 5. It analyzes the results and rewrites the prompt to improve measured quality.
 
 Model names are anonimized for analyzis and prompting to avoid bias.
-<br>Parameters(columns) on the picture are chosen by a meta prompt model to rate output quality.
 
-![display_model.png](display_model.png)
+![prompt_optimizer_loop](prompt_optimizer_loop.svg)
+
 
 ## Installation
 
@@ -106,6 +106,9 @@ Display one model:
 ```python
 optimizer.display_model("provider/executor-model-a")
 ```
+Parameters(columns) on the picture are chosen by a meta prompt model to rate output quality.
+![display_model.png](display_model.png)
+
 
 Print the input/output pairs from one iteration:
 
