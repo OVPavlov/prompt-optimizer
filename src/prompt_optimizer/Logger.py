@@ -126,5 +126,3 @@ class Logger:
 				dataset.add_mr(mr)
 
 		return dataset
-
-

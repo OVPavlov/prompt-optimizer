@@ -1,4 +1,7 @@
 import json
+import difflib
+import shutil
+import subprocess
 from random import sample
 from .LLMClient import LLMClient, LLModel, RequestStats
 import pandas as pd
@@ -9,6 +12,7 @@ from .Logger import Logger
 from .MetaPrompt import MetaPrompt
 from .ResultAnalyzer import ResultAnalyzer
 from .PromptGenerator import PromptGenerator
+from .PromptCommon import get_ratings
 
 
 class PromptOptimizer:
@@ -213,6 +217,81 @@ class PromptOptimizer:
 			name = m[m.index('/')+1:]
 			columns[name] = df.mean(axis=1).astype(float)
 		display(pd.DataFrame(columns).style.bar(subset=list(columns), cmap='RdYlGn', vmin=0, vmax=1).format("{:.0%}"))
+
+	def print_prompt_history(self, model:str|None=None):
+		if model is not None and model not in self.dataset.results:
+			raise ValueError(f"Unknown model: {model}")
+
+		old_prompt = None
+		old_rating = None
+
+		for info in self.dataset.iterations:
+			if model is None:
+				parts = [info.prompt.system.strip("\n")]
+				if isinstance(info.prompt.instructions, dict):
+					parts += [f"[{name}]\n{text.strip(chr(10))}"
+							  for name, text in info.prompt.instructions.items() if text is not None]
+				elif info.prompt.instructions:
+					parts.append(info.prompt.instructions.strip("\n"))
+				rating = get_ratings(self.dataset, info.iteration)
+			else:
+				instructions = info.prompt.instructions
+				instructions = instructions.get(model) if isinstance(instructions, dict) else instructions
+				parts = [info.prompt.system.replace(
+					"{per_model_instructions}", instructions or "").strip("\n")]
+				rating = self.dataset.get_mr(model, info.iteration).rating
+
+			if info.prompt.user_message is not None:
+				parts.append(info.prompt.user_message.strip("\n"))
+			prompt = "\n\n".join(parts)
+
+			print(f"\033[1;38;5;208m{'=' * 25} ITERATION {info.iteration} {'=' * 25}\033[0m")
+			if old_prompt is None:
+				print(prompt)
+			else:
+				old_lines = old_prompt.splitlines()
+				new_lines = prompt.splitlines()
+				diff = list(difflib.unified_diff(
+					old_lines, new_lines, fromfile="old", tofile="new",
+					lineterm="", n=max(len(old_lines), len(new_lines))))
+				if not diff:
+					print(prompt)
+				else:
+					delta = shutil.which("delta")
+					try:
+						rendered = subprocess.run([
+							delta, "--no-gitconfig", "--paging=never", "--file-style=omit",
+							"--hunk-header-style=omit", "--syntax-theme=none",
+							"--keep-plus-minus-markers", "--width=variable",
+							"--minus-style=red", "--minus-emph-style=red bold reverse",
+							"--plus-style=green", "--plus-emph-style=green bold reverse",
+							"--zero-style=normal", "--max-line-distance=0.8",
+						], input="\n".join(diff) + "\n", text=True,
+							capture_output=True, check=True).stdout if delta else None
+					except (OSError, subprocess.CalledProcessError):
+						rendered = None
+
+					if rendered:
+						print(rendered.lstrip("\n"), end="")
+					else:
+						for line in diff[3:]:
+							color = "\033[31m" if line.startswith("-") else \
+									"\033[32m" if line.startswith("+") else ""
+							print(f"{color}{line}\033[0m" if color else line)
+
+			print("\033[1mRatings\033[0m")
+			for name, value in rating.items():
+				if old_rating is None:
+					print(f"{name}: {value:.0%}")
+					continue
+				change = value - old_rating[name]
+				color = "\033[32m" if change > 0 else "\033[31m" if change < 0 else ""
+				numbers = f"{value:.0%} ({change:+.0%})"
+				print(f"{name}: {color}{numbers}\033[0m" if color else f"{name}: {numbers}")
+			print()
+
+			old_prompt = prompt
+			old_rating = rating
 
 	def get_cost(self):
 		cost_dict = {
