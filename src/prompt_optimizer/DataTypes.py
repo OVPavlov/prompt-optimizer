@@ -89,7 +89,7 @@ class ResultDataset:
 		it = self.get_i(iteration)
 		if it is None:
 			return None
-		return [self.results[model][iteration] for model in it.models]
+		return [mr for model in it.models if (mr := self.get_mr(model, iteration)) is not None]
 
 
 class ExperimentValues:

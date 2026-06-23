@@ -49,4 +49,4 @@ def aggregate(records: list[dict]) -> dict[str, float]:
 
 def get_ratings(dataset:ResultDataset, iteration:int) -> dict[str, float]:
 	all_mr:list[ModelResult] = dataset.get_all_mr(iteration)
-	return aggregate([mr.rating for mr in all_mr])
+	return aggregate([mr.rating for mr in all_mr if mr.rating is not None])

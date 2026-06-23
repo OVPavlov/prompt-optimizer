@@ -218,12 +218,13 @@ class PromptOptimizer:
 			columns[name] = df.mean(axis=1).astype(float)
 		display(pd.DataFrame(columns).style.bar(subset=list(columns), cmap='RdYlGn', vmin=0, vmax=1).format("{:.0%}"))
 
-	def print_prompt_history(self, model:str|None=None):
+	def print_prompt_history(self, model:str|None=None, show_diff:bool=True, show_stated_changes:bool=True):
 		if model is not None and model not in self.dataset.results:
 			raise ValueError(f"Unknown model: {model}")
 
 		old_prompt = None
 		old_rating = None
+		previous_changes = None
 
 		for info in self.dataset.iterations:
 			if model is None:
@@ -246,7 +247,7 @@ class PromptOptimizer:
 			prompt = "\n\n".join(parts)
 
 			print(f"\033[1;38;5;208m{'=' * 25} ITERATION {info.iteration} {'=' * 25}\033[0m")
-			if old_prompt is None:
+			if not show_diff or old_prompt is None:
 				print(prompt)
 			else:
 				old_lines = old_prompt.splitlines()
@@ -279,9 +280,18 @@ class PromptOptimizer:
 									"\033[32m" if line.startswith("+") else ""
 							print(f"{color}{line}\033[0m" if color else line)
 
+			if show_stated_changes:
+				print("\033[1mPrompt changes\033[0m")
+				if old_prompt is None:
+					print("Initial prompt")
+				else:
+					print(previous_changes if previous_changes else "Not found")
+
 			print("\033[1mRatings\033[0m")
+			if not rating:
+				print("Not found")
 			for name, value in rating.items():
-				if old_rating is None:
+				if old_rating is None or name not in old_rating:
 					print(f"{name}: {value:.0%}")
 					continue
 				change = value - old_rating[name]
@@ -292,6 +302,7 @@ class PromptOptimizer:
 
 			old_prompt = prompt
 			old_rating = rating
+			previous_changes = info.prompt_changes
 
 	def get_cost(self):
 		cost_dict = {
