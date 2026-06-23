@@ -88,6 +88,8 @@ class Logger:
 	def load_results(self, iteration: int) -> list[ModelResult]:
 		dir = self.get_iteration_dir(iteration)
 		res = load_json(dir / "results.json")
+		if res is None:
+			return []
 		anal = load_json(dir / "analysis.json")
 		results:list[ModelResult] = [from_dict(ModelResult, mr) for mr in res]
 		if anal is not None:
