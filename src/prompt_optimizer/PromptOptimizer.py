@@ -218,13 +218,17 @@ class PromptOptimizer:
 			columns[name] = df.mean(axis=1).astype(float)
 		display(pd.DataFrame(columns).style.bar(subset=list(columns), cmap='RdYlGn', vmin=0, vmax=1).format("{:.0%}"))
 
-	def print_prompt_history(self, model:str|None=None, show_diff:bool=True, show_stated_changes:bool=True):
+	def print_prompt_history(self, model:str|None=None, show_diff:bool=True, show_stated_changes:bool=True,
+							 iterations:int|range|None=None):
 		if model is not None and model not in self.dataset.results:
 			raise ValueError(f"Unknown model: {model}")
+		if iterations is not None and (isinstance(iterations, bool) or not isinstance(iterations, (int, range))):
+			raise TypeError("iterations must be an int, range, or None")
 
 		old_prompt = None
 		old_rating = None
 		previous_changes = None
+		displayed = 0
 
 		for info in self.dataset.iterations:
 			if model is None:
@@ -240,12 +244,27 @@ class PromptOptimizer:
 				instructions = instructions.get(model) if isinstance(instructions, dict) else instructions
 				parts = [info.prompt.system.replace(
 					"{per_model_instructions}", instructions or "").strip("\n")]
-				rating = self.dataset.get_mr(model, info.iteration).rating
+				model_result = self.dataset.get_mr(model, info.iteration)
+				rating = model_result.rating if model_result is not None and model_result.rating is not None else {}
 
 			if info.prompt.user_message is not None:
 				parts.append(info.prompt.user_message.strip("\n"))
 			prompt = "\n\n".join(parts)
 
+			if iterations is None:
+				selected = True
+			elif isinstance(iterations, int):
+				selected = info.iteration == iterations
+			else:
+				selected = info.iteration in iterations
+
+			if not selected:
+				old_prompt = prompt
+				old_rating = rating
+				previous_changes = info.prompt_changes
+				continue
+
+			displayed += 1
 			print(f"\033[1;38;5;208m{'=' * 25} ITERATION {info.iteration} {'=' * 25}\033[0m")
 			if not show_diff or old_prompt is None:
 				print(prompt)
@@ -303,6 +322,9 @@ class PromptOptimizer:
 			old_prompt = prompt
 			old_rating = rating
 			previous_changes = info.prompt_changes
+
+		if iterations is not None and displayed == 0:
+			raise ValueError(f"No matching iterations found for {iterations}")
 
 	def get_cost(self):
 		cost_dict = {
