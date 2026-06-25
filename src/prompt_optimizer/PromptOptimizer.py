@@ -328,16 +328,17 @@ class PromptOptimizer:
 
 	def get_cost(self):
 		cost_dict = {
-			"meta_prompt": self.meta_prompt.llmodel.accumulated_cost,
-			"analysis": self.result_analyzer.llmodel.accumulated_cost,
-			"prompt_generator": self.prompt_generator.llmodel.accumulated_cost,
+			"meta_prompt": self.meta_prompt.llmodel.get_stats_avg().cost,
+			"analysis": self.result_analyzer.llmodel.get_stats_avg().cost,
+			"prompt_generator": self.prompt_generator.llmodel.get_stats_avg().cost,
 		}
 		an_gen_total = sum(cost_dict.values())
 		test_total = 0.0
 		for k, v in  self.ll_models.items():
 			name = k[k.index('/') + 1:]
-			cost_dict[f'TEST_{name}'] = v.accumulated_cost
-			test_total += v.accumulated_cost
+			model_cost = v.get_stats_avg().cost
+			cost_dict[f'TEST_{name}'] = model_cost
+			test_total += model_cost
 		cost_dict['TEST_TOTAL'] = test_total
 		cost_dict['Total Cost'] = test_total + an_gen_total
 		return cost_dict

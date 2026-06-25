@@ -101,6 +101,22 @@ class RequestStats:
 		obj.time = datetime.datetime.fromisoformat(d["time"])
 		return obj
 
+	@staticmethod
+	def empty(model: str = "") -> "RequestStats":
+		obj = object.__new__(RequestStats)
+		obj.time = datetime.datetime.fromtimestamp(0)
+		obj.cost = 0.0
+		obj.model = model
+		obj.prompt_tokens = 0
+		obj.prompt_cost = 0.0
+		obj.completion_tokens = 0
+		obj.completions_cost = 0.0
+		obj.cached = 0
+		obj.reasoning = 0
+		obj.finish_reason = ""
+		obj.latency = 0.0
+		return obj
+
 def _log_completion(stats:RequestStats, filename="log.csv"):
 	try:
 		headers = ["time","cost_$","accum_cost_$","model","prompt_t",		  "prompt_$",	"completion_t",			"completion_$",		"cached_t","reasoning_t","finish_reason","latency"]
@@ -323,10 +339,10 @@ class LLModel:
 		return avg.latency if avg is not None else 0.0
 
 	def get_stats_avg(self) -> RequestStats:
-		return RequestStats.avg(self.stats_list)
+		return RequestStats.avg(self.stats_list) or RequestStats.empty(self.model_id)
 
 	def get_stats_sum(self) -> RequestStats:
-		return RequestStats.sum(self.stats_list)
+		return RequestStats.sum(self.stats_list) or RequestStats.empty(self.model_id)
 
 
 	_stats_lock = threading.Lock()
