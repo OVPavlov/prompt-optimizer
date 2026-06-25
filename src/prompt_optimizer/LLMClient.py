@@ -281,18 +281,24 @@ class LLModel:
 		self.stats_key = stats_key or model_id
 		self.load_stats(self.stats_path, self.stats_key)
 
-	def to_dict(self):
+	def to_dict(self, relative_to: Path = None):
+		stats_path = self.stats_path
+		if stats_path is not None and relative_to is not None:
+			stats_path = stats_path.relative_to(relative_to)
 		return {
 			"model_id": self.model_id,
 			"client": self.client.base_url,
 			"extra_params": self.extra_params,
-			"stats_path": str(self.stats_path),
+			"stats_path": str(stats_path) if stats_path is not None else None,
 			"stats_key": self.stats_key,
 		}
 
 	@staticmethod
-	def from_dict(d: dict):
-		return LLModel(LLMClient.from_base_url(d["client"]), d["model_id"], d["extra_params"], d["stats_path"], d["stats_key"])
+	def from_dict(d: dict, relative_to: Path = None):
+		stats_path = d["stats_path"]
+		if stats_path is not None and relative_to is not None:
+			stats_path = relative_to / Path(stats_path)
+		return LLModel(LLMClient.from_base_url(d["client"]), d["model_id"], d["extra_params"], stats_path, d["stats_key"])
 
 	def turn_on_reasoning(self, effort: Literal["xhigh", "high", "medium", "low", "minimal", "none"] = "medium", exclude: bool = False):
 		self.extra_params = {"extra_body": {"reasoning": {

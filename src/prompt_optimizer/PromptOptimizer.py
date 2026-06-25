@@ -54,10 +54,10 @@ class PromptOptimizer:
 		params_dict = {
 			'all_data': self.all_data,
 			'client': self.client.base_url,
-			'meta_prompt_model': self.meta_prompt.llmodel.to_dict(),
-			'analysis_model': self.result_analyzer.llmodel.to_dict(),
-			'prompt_model': self.prompt_generator.llmodel.to_dict(),
-			'models': {k:v.to_dict() for k, v in self.ll_models.items()}
+			'meta_prompt_model': self.meta_prompt.llmodel.to_dict(self.dir),
+			'analysis_model': self.result_analyzer.llmodel.to_dict(self.dir),
+			'prompt_model': self.prompt_generator.llmodel.to_dict(self.dir),
+			'models': {k:v.to_dict(self.dir) for k, v in self.ll_models.items()}
 		}
 		params_path.write_text(json.dumps(params_dict, indent=2, ensure_ascii=False))
 
@@ -71,12 +71,12 @@ class PromptOptimizer:
 		models_dict = params["models"]
 
 		prompt_optimizer = PromptOptimizer(directory, task_description, all_data, client,
-							meta_prompt_model=LLModel.from_dict(params["meta_prompt_model"]),
-							analysis_model=LLModel.from_dict(params["analysis_model"]),
-							prompt_model=LLModel.from_dict(params["prompt_model"]),
+							meta_prompt_model=LLModel.from_dict(params["meta_prompt_model"], dir),
+							analysis_model=LLModel.from_dict(params["analysis_model"], dir),
+							prompt_model=LLModel.from_dict(params["prompt_model"], dir),
 							models=list(models_dict.keys()), save_params=False)
 
-		prompt_optimizer.ll_models = {k:LLModel.from_dict(v) for k, v in models_dict.items()}
+		prompt_optimizer.ll_models = {k:LLModel.from_dict(v, dir) for k, v in models_dict.items()}
 		for llmodel in prompt_optimizer.ll_models.values():
 			llmodel.load_stats(llmodel.stats_path, llmodel.stats_key)
 
