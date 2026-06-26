@@ -33,15 +33,18 @@ class RequestStats:
 
 	def __init__(self, completion:ChatCompletion, latency:float):
 		usage = completion.usage
+		cost_details = _get_field(usage, 'cost_details')
+		prompt_details = _get_field(usage, 'prompt_tokens_details')
+		completion_details = _get_field(usage, 'completion_tokens_details')
 		self.time = datetime.datetime.now()
-		self.cost = float(usage.cost)
+		self.cost = float(_get_field(usage, 'cost', 0) or 0)
 		self.model = str(completion.model)
-		self.prompt_tokens = usage.prompt_tokens
-		self.prompt_cost = float(_get_field(usage.cost_details, 'upstream_inference_prompt_cost'))
-		self.completion_tokens = usage.completion_tokens
-		self.completions_cost = float(_get_field(usage.cost_details, 'upstream_inference_completions_cost'))
-		self.cached = int(_get_field(usage.prompt_tokens_details, 'cached_tokens'))
-		self.reasoning = int(_get_field(usage.completion_tokens_details, 'reasoning_tokens'))
+		self.prompt_tokens = int(_get_field(usage, 'prompt_tokens', 0) or 0)
+		self.prompt_cost = float(_get_field(cost_details, 'upstream_inference_prompt_cost', 0) or 0)
+		self.completion_tokens = int(_get_field(usage, 'completion_tokens', 0) or 0)
+		self.completions_cost = float(_get_field(cost_details, 'upstream_inference_completions_cost', 0) or 0)
+		self.cached = int(_get_field(prompt_details, 'cached_tokens', 0) or 0)
+		self.reasoning = int(_get_field(completion_details, 'reasoning_tokens', 0) or 0)
 		self.finish_reason = str(completion.choices[-1].finish_reason)
 		self.latency = latency
 
