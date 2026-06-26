@@ -117,22 +117,25 @@ class RequestStats:
 		obj.latency = 0.0
 		return obj
 
+_log_lock = threading.Lock()
+
 def _log_completion(stats:RequestStats, filename="log.csv"):
 	try:
 		headers = ["time","cost_$","accum_cost_$","model","prompt_t",		  "prompt_$",	"completion_t",			"completion_$",		"cached_t","reasoning_t","finish_reason","latency"]
 		new_row = stats.get_log_row()
-		if not os.path.exists(filename):
-			with open(filename, "w", newline="") as f:
-				csv.writer(f).writerow(headers)
+		with _log_lock:
+			if not os.path.exists(filename):
+				with open(filename, "w", newline="") as f:
+					csv.writer(f).writerow(headers)
 
-		with open("log.csv", "r+") as f:
-			rows = list(csv.reader(f))
-			accum = 0
-			if len(rows) > 1:
-				last_row = rows[-1]
-				accum = float(last_row[2])
-			new_row[2] += accum
-			csv.writer(f).writerow(new_row)
+			with open(filename, "r+", newline="") as f:
+				rows = list(csv.reader(f))
+				accum = 0
+				if len(rows) > 1:
+					last_row = rows[-1]
+					accum = float(last_row[2])
+				new_row[2] += accum
+				csv.writer(f).writerow(new_row)
 	except Exception as err:
 		print(f"Logging Error: {err=}, {type(err)=}")
 
