@@ -1,7 +1,6 @@
 from .LLMClient import LLModel
-import xml.etree.ElementTree as ET
 from .DataTypes import Prompt, ModelResult, IterationInfo, ResultDataset, ExperimentValues
-from .PromptCommon import ParseError, get_ratings, extract_tag, safe_format
+from .PromptCommon import ParseError, get_ratings, extract_tag, extract_all, safe_format
 from .MetaPrompt import MetaPrompt
 
 
@@ -197,10 +196,8 @@ def _parse_response(response:str, from_anon:dict) -> Prompt:
 	instructions_text = extract_tag(response, 'per_model_instructions')
 	instructions_dict = {}
 	if instructions_text is not None:
-		instructions_node = ET.fromstring(f'<root>{instructions_text}</root>')
-		for model in instructions_node.findall('model'):
-			letter = model.get('id')
-			instructions_dict[from_anon[letter]] = model.text
+		for t in extract_all(instructions_text, 'model'):
+			instructions_dict[from_anon[t.attrs['id']]] = (t.body or '').strip()
 
 	return Prompt(system_prompt, instructions_dict, user_prompt)
 

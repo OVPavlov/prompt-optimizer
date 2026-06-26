@@ -1,3 +1,5 @@
+import re
+from collections import namedtuple
 from .DataTypes import ModelResult, ResultDataset
 from importlib.resources import files
 
@@ -40,6 +42,39 @@ def extract_tag(text, tag):
 	if start == -1 or end == -1:
 		return None
 	return text[start + len(tag) + 2:end]
+
+
+Tag = namedtuple("Tag", ["attrs", "body"])
+
+_ATTR_RE = re.compile(r'([\w:.\-]+)\s*=\s*"([^"]*)"' r"|([\w:.\-]+)\s*=\s*'([^']*)'")
+
+def extract_all(text: str, tag: str) -> list[Tag]:
+	"""Find every <tag ...>body</tag> block.
+
+	Returns a list of Tag(attrs, body) in document order:
+	  - attrs: dict of the opening tag's attributes (str -> str)
+	  - body:  raw inner text
+
+	Body is taken verbatim, so <, >, & inside it are preserved (no XML
+	parsing). Assumes same-name tags are not nested; attribute values
+	must not contain a literal '>'.
+	"""
+	open_re = re.compile(rf'<{re.escape(tag)}(?=[\s>])([^>]*)>')
+	results, pos = [], 0
+	while (m := open_re.search(text, pos)) is not None:
+		attrs = {}
+		for a in _ATTR_RE.finditer(m.group(1)):
+			if a.group(1) is not None:
+				attrs[a.group(1)] = a.group(2)
+			else:
+				attrs[a.group(3)] = a.group(4)
+		close = text.find(f"</{tag}>", m.end())
+		if close == -1:
+			results.append(Tag(attrs, text[m.end():]))
+			break
+		results.append(Tag(attrs, text[m.end():close]))
+		pos = close + len(tag) + 3
+	return results
 
 def aggregate(records: list[dict]) -> dict[str, float]:
 	return {
