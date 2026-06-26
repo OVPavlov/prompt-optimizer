@@ -242,8 +242,10 @@ class LLMClient:
 				return model
 		return None
 
-	def request(self, system_msg, text, model, extra_params=None, raise_retryable=False):
+	def _request_with_details(self, system_msg, text, model, extra_params=None, raise_retryable=False):
 		res = None
+		stats = None
+		completion = None
 		try:
 			no_temp_set = {"gpt-5-nano", "gpt-5-mini"} # only needed for open ai api
 			temp = 1.0 if model in no_temp_set else 0.0
@@ -272,6 +274,10 @@ class LLMClient:
 				print(f"Unexpected {e=}, {type(e)=}")
 		except Exception as e:
 			print(f"Unexpected {e=}, {type(e)=}")
+		return res, stats, completion
+
+	def request(self, system_msg, text, model, extra_params=None, raise_retryable=False):
+		res, _, _ = self._request_with_details(system_msg, text, model, extra_params, raise_retryable)
 		return res
 
 
@@ -323,14 +329,16 @@ class LLModel:
 		}}}
 
 	def request(self, system_msg, text, raise_retryable=False):
-		response = self.client.request(system_msg, text, self.model_id, self.extra_params, raise_retryable=raise_retryable)
-		stats:RequestStats = self.client.stats_list[-1]
-		self.stats_list.append(stats)
+		response, stats, completion = self.client._request_with_details(
+			system_msg, text, self.model_id, self.extra_params, raise_retryable=raise_retryable)
+		if stats is not None:
+			self.stats_list.append(stats)
 
-		if self.client.completions is not None:
-			self.completions.append(self.client.completions[-1])
+		if self.client.completions is not None and completion is not None:
+			self.completions.append(completion)
 
-		self._save_stats()
+		if stats is not None:
+			self._save_stats()
 		return response
 
 	@property
