@@ -41,13 +41,27 @@ class PromptOptimizer:
 		self.values = ExperimentValues(models)
 		if self.dir.exists() and len(list(self.logger.root.glob("iter_*"))) > 0:
 			self.dataset = self.logger.load_dataset()
-			self.values.from_dataset(self.dataset)
+			self._restore_values_from_log()
 		else:
 			self.dataset = ResultDataset(models)
 			self.values.prompt = self.get_first_prompt(use_task_as_first_prompt=use_task_as_first_prompt) # load or generate
 
 		if save_params:
 			self._save_params()
+
+	def _set_iteration_state(self, info: IterationInfo):
+		self.values.current_iteration = info.iteration
+		self.values.prompt = info.prompt
+		self.values.current_models = info.models
+		self.values.data_list = info.data
+
+	def _restore_values_from_log(self):
+		last_info = self.dataset.iterations[-1]
+		self._set_iteration_state(last_info)
+		if self.logger.has_new_prompt(last_info.iteration):
+			self.values.prompt = self.logger.load_new_prompt(last_info.iteration)
+			self.values.current_iteration = last_info.iteration + 1
+			self.values.data_list = []
 
 	def _save_params(self):
 		params_path = self.dir / "params.json"
@@ -110,8 +124,12 @@ class PromptOptimizer:
 
 
 	def generate_results_parallel(self):
-		info = IterationInfo(self.values.current_iteration, self.values.prompt, self.values.current_models, self.values.data_list)
-		self.dataset.add_i(info)
+		info = self.dataset.get_i(self.values.current_iteration)
+		if info is None:
+			info = IterationInfo(self.values.current_iteration, self.values.prompt, self.values.current_models, self.values.data_list)
+			self.dataset.add_i(info)
+		else:
+			self._set_iteration_state(info)
 		self.logger.log_info(info)
 
 		for model in self.values.current_models:
@@ -143,7 +161,7 @@ class PromptOptimizer:
 
 			info = self.dataset.get_i(self.values.current_iteration)
 			if info is not None:
-				self.values.data_list = info.data
+				self._set_iteration_state(info)
 			else:
 				self.values.data_list = sample(self.all_data, num_data)
 
