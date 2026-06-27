@@ -24,11 +24,8 @@ class Prompt:
 		return Prompt(self.system, self.instructions[model], self.user_message)
 
 	def system_message_for(self, model:str) -> str:
-		if type(self.instructions) == dict and model in self.instructions:
-			instructions = self.instructions[model]
-			if instructions is not None:
-				return self.system.replace('{per_model_instructions}', self.instructions[model])
-		return self.system
+		instructions = self.instructions.get(model) if type(self.instructions) == dict else None
+		return self.system.replace('{per_model_instructions}', instructions or '')
 
 @dataclass
 class ModelResult:
