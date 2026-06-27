@@ -73,7 +73,7 @@ optimizer = PromptOptimizer(
     all_data=input_data,
     client=client,
     meta_prompt_model=client.get_reasoning_model('google/gemini-3.1-pro-preview', effort="high"),
-    analysis_model=client.get_reasoning_model('google/gemini-3.1-pro-preview', effort="low"),
+    analysis_models=client.get_reasoning_model('google/gemini-3.1-pro-preview', effort="low"),
     prompt_model=client.get_reasoning_model('google/gemini-3.1-pro-preview', effort="medium"),
     models=executor_models)
 ```

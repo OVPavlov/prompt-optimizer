@@ -17,8 +17,8 @@ from .PromptCommon import get_ratings
 
 class PromptOptimizer:
 	def __init__(self, directory:str, task_description:str, all_data:list,
-				 client:LLMClient, meta_prompt_model:LLModel, analysis_model:LLModel, prompt_model:LLModel, models:list[str],
-				 use_task_as_first_prompt:bool=False, save_params:bool=True):
+				 client:LLMClient, meta_prompt_model:LLModel, analysis_models:LLModel|list[LLModel], prompt_model:LLModel, models:list[str],
+				 analysis_max_data_items:int|None=None, use_task_as_first_prompt:bool=False, save_params:bool=True):
 		self.client = client
 		self.dir = Path(directory)
 		self.logger = Logger(f"{directory}/log")
@@ -28,14 +28,17 @@ class PromptOptimizer:
 
 		self.ll_models: dict[str, LLModel] = {m:client.get_LLmodel(m, stats_path=self.llm_stats_path, stats_key=m) for m in models}
 
+		analysis_models = analysis_models if isinstance(analysis_models, list) else [analysis_models]
+
 		meta_prompt_model.load_stats(self.llm_stats_path, "meta_prompt_model")
-		analysis_model.load_stats(self.llm_stats_path, "analysis_model")
+		for i, am in enumerate(analysis_models):
+			am.load_stats(self.llm_stats_path, "analysis_model" if len(analysis_models) == 1 else f"analysis_model_{i}")
 		prompt_model.load_stats(self.llm_stats_path, "prompt_model")
 
 		self.meta_prompt = MetaPrompt(directory, meta_prompt_model, self.task_description)
 		self.meta_prompt.generate_rating_schema() # load or generate
 
-		self.result_analyzer = ResultAnalyzer(self.meta_prompt.analysis_system_message, None, analysis_model)
+		self.result_analyzer = ResultAnalyzer(self.meta_prompt.analysis_system_message, None, analysis_models, analysis_max_data_items)
 		self.prompt_generator = PromptGenerator(self.meta_prompt, "{context}", prompt_model)
 
 		self.values = ExperimentValues(models)
@@ -69,7 +72,8 @@ class PromptOptimizer:
 			'all_data': self.all_data,
 			'client': self.client.base_url,
 			'meta_prompt_model': self.meta_prompt.llmodel.to_dict(self.dir),
-			'analysis_model': self.result_analyzer.llmodel.to_dict(self.dir),
+			'analysis_models': [m.to_dict(self.dir) for m in self.result_analyzer.llmodels],
+			'analysis_max_data_items': self.result_analyzer.max_data_items,
 			'prompt_model': self.prompt_generator.llmodel.to_dict(self.dir),
 			'models': {k:v.to_dict(self.dir) for k, v in self.ll_models.items()}
 		}
@@ -86,7 +90,8 @@ class PromptOptimizer:
 
 		prompt_optimizer = PromptOptimizer(directory, task_description, all_data, client,
 							meta_prompt_model=LLModel.from_dict(params["meta_prompt_model"], dir),
-							analysis_model=LLModel.from_dict(params["analysis_model"], dir),
+							analysis_models=[LLModel.from_dict(m, dir) for m in params["analysis_models"]],
+							analysis_max_data_items=params.get("analysis_max_data_items"),
 							prompt_model=LLModel.from_dict(params["prompt_model"], dir),
 							models=list(models_dict.keys()), save_params=False)
 
@@ -100,7 +105,7 @@ class PromptOptimizer:
 	def create_standard(directory:str, task_description:str, all_data:list, client:LLMClient, models:list[str], main_model:str):
 		return PromptOptimizer(directory, task_description, all_data, client,
 					 meta_prompt_model=client.get_reasoning_model(main_model, effort="high"),
-					 analysis_model=client.get_reasoning_model(main_model, effort="low"),
+					 analysis_models=client.get_reasoning_model(main_model, effort="low"),
 					 prompt_model=client.get_reasoning_model(main_model, effort="medium"),
 					 models=models)
 
@@ -193,7 +198,7 @@ class PromptOptimizer:
 		bool_num = 0
 		for m in self.dataset.iterations[-1].models:
 			df = pd.DataFrame([r.rating for r in self.dataset.results[m]])
-			name = m[m.index('/')+1:] if '/' in m else m
+			name = self._short_name(m)
 			bool_num = max(bool_num, len(df.select_dtypes(include='bool').columns))
 			if display_pass:
 				columns[f'{name}_pass' if both else name] = df.select_dtypes(include='bool').sum(axis=1)
@@ -232,7 +237,7 @@ class PromptOptimizer:
 			return
 		for m in self.dataset.iterations[-1].models:
 			df = pd.DataFrame([r.rating for r in self.dataset.results[m]])
-			name = m[m.index('/')+1:]
+			name = self._short_name(m)
 			columns[name] = df.mean(axis=1).astype(float)
 		display(pd.DataFrame(columns).style.bar(subset=list(columns), cmap='RdYlGn', vmin=0, vmax=1).format("{:.0%}"))
 
@@ -344,16 +349,21 @@ class PromptOptimizer:
 		if iterations is not None and displayed == 0:
 			raise ValueError(f"No matching iterations found for {iterations}")
 
+	@staticmethod
+	def _short_name(model_id:str) -> str:
+		return model_id[model_id.index('/') + 1:] if '/' in model_id else model_id
+
 	def get_cost(self):
 		cost_dict = {
 			"meta_prompt": self.meta_prompt.llmodel.get_stats_avg().cost,
-			"analysis": self.result_analyzer.llmodel.get_stats_avg().cost,
 			"prompt_generator": self.prompt_generator.llmodel.get_stats_avg().cost,
 		}
+		for m in self.result_analyzer.llmodels:
+			cost_dict[f"analysis_{self._short_name(m.model_id)}"] = m.get_stats_avg().cost
 		an_gen_total = sum(cost_dict.values())
 		test_total = 0.0
 		for k, v in  self.ll_models.items():
-			name = k[k.index('/') + 1:]
+			name = self._short_name(k)
 			model_cost = v.get_stats_avg().cost
 			cost_dict[f'TEST_{name}'] = model_cost
 			test_total += model_cost
@@ -364,11 +374,12 @@ class PromptOptimizer:
 	def get_latencies(self):
 		latency_dict = {
 			"meta_prompt": self.meta_prompt.llmodel.avg_latency,
-			"analysis": self.result_analyzer.llmodel.avg_latency,
 			"prompt_generator": self.prompt_generator.llmodel.avg_latency,
 		}
+		for m in self.result_analyzer.llmodels:
+			latency_dict[f"analysis_{self._short_name(m.model_id)}"] = m.avg_latency
 		for k, v in self.ll_models.items():
-			name = k[k.index('/') + 1:]
+			name = self._short_name(k)
 			latency_dict[f'TEST_{name}'] = v.avg_latency
 		return latency_dict
 
@@ -384,20 +395,21 @@ class PromptOptimizer:
 		display(df)
 
 	def _aggregate_stats(self, aggregator:callable) -> dict[str, RequestStats]:
-		llms = {
-			"meta_prompt": self.meta_prompt.llmodel,
-			"analysis": self.result_analyzer.llmodel,
-			"prompt_generator": self.prompt_generator.llmodel,
+		stat_lists = {
+			"meta_prompt": self.meta_prompt.llmodel.stats_list,
+			"prompt_generator": self.prompt_generator.llmodel.stats_list,
 		}
+		for m in self.result_analyzer.llmodels:
+			stat_lists[f"analysis_{self._short_name(m.model_id)}"] = m.stats_list
 		test = []
 		for k, v in  self.ll_models.items():
-			name = k[k.index('/') + 1:]
-			llms[f'TEST_{name}'] = v
+			name = self._short_name(k)
+			stat_lists[f'TEST_{name}'] = v.stats_list
 			test.append(aggregator(v.stats_list))
 
-		d = {k:aggregator(v.stats_list) for k, v in llms.items()}
+		d = {k:aggregator(v) for k, v in stat_lists.items()}
 		d["TEST_TOTAL"] = aggregator(test)
-		d["TOTAL"] = aggregator([aggregator(v.stats_list) for k, v in llms.items()])
+		d["TOTAL"] = aggregator([aggregator(v) for v in stat_lists.values()])
 		d = {k: v for k, v in d.items() if v is not None}
 		for k, v in d.items():
 			if v is not None:
