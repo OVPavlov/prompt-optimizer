@@ -43,7 +43,7 @@ def merge_analyses(parts:list[tuple[str, dict, int]]) -> tuple[str, dict]:
 
 class ResultAnalyzer:
 	def __init__(self, system_prompt:str, user_message:str|None, llmodels:LLModel|list[LLModel], max_data_items:int|None = None):
-		""" Expected analysis result XML tags: <analysis> text </analysis>, <rating> json </rating>.
+		""" Expected analysis result XML tags: <analysis> text </analysis>, <rating> json </rating>."""
 		self.system_prompt = system_prompt
 		self.user_message = user_message
 		self.llmodels:list[LLModel] = llmodels if isinstance(llmodels, list) else [llmodels]
