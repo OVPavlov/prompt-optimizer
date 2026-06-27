@@ -198,7 +198,7 @@ class PromptOptimizer:
 			if display_pass:
 				columns[f'{name}_pass' if both else name] = df.select_dtypes(include='bool').sum(axis=1)
 			if display_rating:
-				columns[f'{name}_rating' if both else name] = df.select_dtypes(include='float').mean(axis=1)
+				columns[f'{name}_rating' if both else name] = df.select_dtypes(include='number').mean(axis=1)
 
 		df, cols = pd.DataFrame(columns), list(columns)
 		style = df.style
@@ -215,7 +215,7 @@ class PromptOptimizer:
 		if self.dataset.results is None or model not in self.dataset.results:
 			return
 		df = pd.DataFrame([r.rating for r in self.dataset.results[model]])
-		floats = df.select_dtypes(include='float').columns
+		floats = df.select_dtypes(include='number').columns
 		bools = df.select_dtypes(include='bool').columns
 
 		def color_bool(val):
