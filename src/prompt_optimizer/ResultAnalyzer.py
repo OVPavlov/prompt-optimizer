@@ -57,25 +57,25 @@ class ResultAnalyzer:
 				context = get_result_context(mr, chunk, include_prompt=True)
 				user_message = str(context) if self.user_message is None else self.user_message.format(context=context)
 				for llmodel in self.llmodels:
-					requests.append(ParallelRequest(llmodel, self.system_prompt, user_message, (mr, len(chunk), user_message, llmodel)))
+					requests.append(ParallelRequest(llmodel, self.system_prompt, user_message, (mr, len(chunk))))
 
 		ParallelRequest.run(requests)
 
 		partials:dict[str, tuple[ModelResult, list]] = {}
 		for req in requests:
-			mr, weight, user_message, llmodel = req.tag
+			mr, weight = req.tag
 			analysis_result = req.output
 
 			try:
 				analysis = extract_tag(analysis_result, 'analysis')
 			except:
-				raise ParseError(system=self.system_prompt, user=user_message, output=analysis_result, model=llmodel.model_id,
+				raise ParseError(system=self.system_prompt, user=req.user, output=analysis_result, model=req.llmodel.model_id,
 					task="Generate analysis and rating for model", failure="Failed to parse analysis tag")
 
 			try:
 				rating = json.loads(extract_tag(analysis_result, 'rating'))
 			except:
-				raise ParseError(system=self.system_prompt, user=user_message, output=analysis_result, model=llmodel.model_id,
+				raise ParseError(system=self.system_prompt, user=req.user, output=analysis_result, model=req.llmodel.model_id,
 					task="Generate analysis and rating for model", failure="Failed to parse rating")
 
 			partials.setdefault(mr.model, (mr, []))[1].append((analysis, rating, weight))
