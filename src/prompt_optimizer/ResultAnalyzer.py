@@ -66,17 +66,13 @@ class ResultAnalyzer:
 			mr, weight = req.tag
 			analysis_result = req.output
 
-			try:
+			with ParseError.guard(self.system_prompt, req.user, analysis_result, req.llmodel.model_id,
+								  "Generate analysis and rating for model", "Failed to parse analysis tag"):
 				analysis = extract_tag(analysis_result, 'analysis')
-			except:
-				raise ParseError(system=self.system_prompt, user=req.user, output=analysis_result, model=req.llmodel.model_id,
-					task="Generate analysis and rating for model", failure="Failed to parse analysis tag")
 
-			try:
+			with ParseError.guard(self.system_prompt, req.user, analysis_result, req.llmodel.model_id,
+								  "Generate analysis and rating for model", "Failed to parse rating"):
 				rating = json.loads(extract_tag(analysis_result, 'rating'))
-			except:
-				raise ParseError(system=self.system_prompt, user=req.user, output=analysis_result, model=req.llmodel.model_id,
-					task="Generate analysis and rating for model", failure="Failed to parse rating")
 
 			partials.setdefault(mr.model, (mr, []))[1].append((analysis, rating, weight))
 

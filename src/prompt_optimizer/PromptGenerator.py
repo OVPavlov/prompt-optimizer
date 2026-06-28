@@ -220,29 +220,23 @@ class PromptGenerator:
 			system_prompt = self.system_prompt
 
 		response = self.llmodel.request(system_prompt, user_message)
-		try:
+		with ParseError.guard(system_prompt, user_message, response, self.llmodel.model_id,
+							  "Generate prompt based on analysis", "Failed to parse prompt tags"):
 			new_prompt = _parse_response(response, values.from_anon)
-		except:
-			raise ParseError(system=system_prompt, user=user_message, output=response, model=self.llmodel.model_id,
-							 task="Generate prompt based on analysis", failure="Failed to parse prompt tags")
 
-		try:
+		with ParseError.guard(system_prompt, user_message, response, self.llmodel.model_id,
+							  "Generate prompt based on analysis", "Failed to parse prompt tags"):
 			dataset.iterations[values.current_iteration].analysis_summary = extract_tag(response, 'last_iteration_summary').strip()
 			dataset.iterations[values.current_iteration].prompt_changes = extract_tag(response, 'prompt_changes').strip()
-		except:
-			raise ParseError(system=system_prompt, user=user_message, output=response, model=self.llmodel.model_id,
-							 task="Generate prompt based on analysis", failure="Failed to parse prompt tags")
 
 		return new_prompt
 
 	def generate_first_prompt(self) -> Prompt:
 		user_message = "Generate initial prompt."
 		response = self.llmodel.request(self.first_system_prompt, user_message)
-		try:
+		with ParseError.guard(self.first_system_prompt, user_message, response, self.llmodel.model_id,
+							  "Generate first prompt", "Failed to parse prompt tags"):
 			new_prompt = _parse_response(response, {})
-		except:
-			raise ParseError(system=self.first_system_prompt, user=user_message, output=response, model=self.llmodel.model_id,
-							 task="Generate first prompt", failure="Failed to parse prompt tags")
 		return new_prompt
 
 	@staticmethod

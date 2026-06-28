@@ -1,5 +1,6 @@
 import re
 from collections import namedtuple
+from contextlib import contextmanager
 from .DataTypes import ModelResult, ResultDataset
 from importlib.resources import files
 
@@ -12,6 +13,17 @@ class ParseError(Exception):
 		self.model = model
 		self.task = task
 		self.failure = failure
+
+	@staticmethod
+	@contextmanager
+	def guard(system: str, user: str, output: str, model: str, task: str, failure: str):
+		"""Re-raise any exception inside the block as a ParseError with shared context."""
+		try:
+			yield
+		except ParseError:
+			raise
+		except Exception as e:
+			raise ParseError(system, user, output, model, task, failure) from e
 
 	def __str__(self):
 		sep = "=" * 60

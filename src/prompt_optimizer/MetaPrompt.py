@@ -53,19 +53,16 @@ class MetaPrompt:
 			rating_schema_source = self.llmodel.request(sys_prompt, user_prompt)
 			self.write_file("rating_schema_source", rating_schema_source)
 
-		try:
+		with ParseError.guard(sys_prompt, user_prompt, rating_schema_source, self.llmodel.model_id,
+							  "Generate rating schema", "Failed to parse tags"):
 			self.output_format_spec = extract_tag(rating_schema_source, 'output_format_spec')
 			self.schema_design = extract_tag(rating_schema_source, 'schema_design')
 			self.analysis_guidance = extract_tag(rating_schema_source, 'analysis_guidance')
 			self.generation_guidance = extract_tag(rating_schema_source, 'generation_guidance')
-		except:
-			raise ParseError(system=sys_prompt, user=user_prompt, output=rating_schema_source, model=self.llmodel.model_id,
-							 task="Generate rating schema", failure="Failed to parse tags")
-		try:
+
+		with ParseError.guard(sys_prompt, user_prompt, rating_schema_source, self.llmodel.model_id,
+							  "Generate rating schema", "Failed to format analysis_template"):
 			self.analysis_system_message = safe_format(analysis_template, vars(self))
-		except:
-			raise ParseError(system=sys_prompt, user=user_prompt, output=rating_schema_source, model=self.llmodel.model_id,
-							 task="Generate rating schema", failure="Failed to format analysis_template")
 
 
 
