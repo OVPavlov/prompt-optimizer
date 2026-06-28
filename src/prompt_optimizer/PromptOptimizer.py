@@ -12,7 +12,7 @@ from .Logger import Logger
 from .MetaPrompt import MetaPrompt
 from .ResultAnalyzer import ResultAnalyzer
 from .PromptGenerator import PromptGenerator
-from .PromptCommon import get_ratings
+from .PromptCommon import get_ratings, extract_all
 
 
 class PromptOptimizer:
@@ -240,6 +240,102 @@ class PromptOptimizer:
 			name = self._short_name(m)
 			columns[name] = df.mean(axis=1).astype(float)
 		display(pd.DataFrame(columns).style.bar(subset=list(columns), cmap='RdYlGn', vmin=0, vmax=1).format("{:.0%}"))
+
+	@staticmethod
+	def _schema_fields(section:str|None) -> list[tuple[str, str, str]]:
+		return [(t.attrs.get("name", ""), t.attrs.get("type", ""), t.body.strip())
+				for t in extract_all(section or "", "field")]
+
+	def _schema_by_field(self) -> dict[str, dict]:
+		mp = self.meta_prompt
+		schema = {n: (t, d) for n, t, d in self._schema_fields(mp.schema_design)}
+		analysis = {n: d for n, _, d in self._schema_fields(mp.analysis_guidance)}
+		generation = {n: d for n, _, d in self._schema_fields(mp.generation_guidance)}
+		return {n: {"type": t,
+					"schema_design": d,
+					"analysis_guidance": analysis.get(n, ""),
+					"generation_guidance": generation.get(n, "")}
+				for n, (t, d) in schema.items()}
+
+	def display_schema_table(self, is_editable:bool=False):
+		data = self._schema_by_field()
+
+		if not is_editable:
+			df = pd.DataFrame.from_dict(data, orient="index").rename_axis("field")
+
+			def color_type(v):
+				bg = '#284' if v == 'bool' else '#c82'
+				return f'background-color:{bg};color:white;font-weight:600;text-align:center;'
+
+			display(df.style
+					.map(color_type, subset=["type"])
+					.set_properties(**{'text-align': 'left', 'white-space': 'normal', 'vertical-align': 'top'})
+					.set_table_styles([{'selector': 'th', 'props': [('text-align', 'left')]}]))
+			return
+
+		import ipywidgets as W
+		mp = self.meta_prompt
+		sections = [k for k in next(iter(data.values()), {}) if k != "type"]
+		areas, children = {}, []
+
+		children.append(W.HTML("<b>field</b>"))
+		children += [W.HTML(f"<b>{s}</b>") for s in sections]
+
+		for name, info in data.items():
+			color = '#284' if info["type"] == 'bool' else '#c82'
+			children.append(W.HTML(
+				f'<code>{name}</code><br>'
+				f'<span style="color:{color};font-weight:600;">{info["type"]}</span>'))
+			areas[name] = {s: W.Textarea(value=info[s], layout=W.Layout(width="100%", height="120px")) for s in sections}
+			children += [areas[name][s] for s in sections]
+
+		grid = W.GridBox(children, layout=W.Layout(grid_template_columns="130px 1fr 1fr 1fr", grid_gap="4px", width="100%"))
+		out = W.Output()
+		btn = W.Button(description="Save", button_style="success")
+
+		def save(_):
+			parts = {}
+			for s in sections:
+				blocks = []
+				for n, info in data.items():
+					type_attr = ' type="{}"'.format(info["type"]) if s == "schema_design" else ""
+					blocks.append('<field name="{}"{}>\n{}\n</field>'.format(
+						n, type_attr, areas[n][s].value.strip()))
+				parts[s] = "\n".join(blocks)
+			mp.write_file("rating_schema_source",
+				"```xml\n"
+				f"<schema_design>\n{parts['schema_design']}\n</schema_design>\n\n"
+				f"<analysis_guidance>\n{parts['analysis_guidance']}\n</analysis_guidance>\n\n"
+				f"<generation_guidance>\n{parts['generation_guidance']}\n</generation_guidance>\n```")
+			mp.generate_rating_schema()
+			self.result_analyzer.system_prompt = mp.analysis_system_message
+			with out:
+				out.clear_output()
+				print("Saved →", mp.dir / "rating_schema_source.txt")
+
+		btn.on_click(save)
+		display(W.VBox([grid, btn, out]))
+
+	def display_schema_cards(self, all_opened:bool=False):
+		from IPython.display import HTML
+		cards = []
+		for i, (name, info) in enumerate(self._schema_by_field().items()):
+			accent = '#284' if info["type"] == 'bool' else '#c82'
+			is_open = " open" if all_opened or (i == 0) else ""
+			body = "".join(
+				f'<div style="margin-top:6px;"><span style="color:#666;font-weight:800;'
+				f'font-size:.9em;letter-spacing:.04em;">{s.upper().replace("_", " ")}</span>'
+				f'<div style="color:#bbb;font-size:.9em">{text}</div></div>'
+				for s, text in info.items() if s != "type")
+			cards.append(
+				f'<details{is_open} style="border-left:4px solid {accent};margin:8px 0;'
+				f'background:rgba(127,127,127,.08);border-radius:4px;">'
+				f'<summary style="cursor:pointer;padding:8px 14px;">'
+				f'<code style="font-size:1.05em;">{name}</code>'
+				f'<span style="color:{accent};font-weight:600;"> &middot; {info["type"] or "?"}</span>'
+				f'</summary>'
+				f'<div style="padding:0 14px 8px;">{body}</div></details>')
+		display(HTML("".join(cards)))
 
 	def print_prompt_history(self, model:str|None=None, show_diff:bool=True, show_stated_changes:bool=True,
 							 iterations:int|range|None=None):
