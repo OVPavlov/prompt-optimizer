@@ -449,35 +449,26 @@ class PromptOptimizer:
 	def _short_name(model_id:str) -> str:
 		return model_id[model_id.index('/') + 1:] if '/' in model_id else model_id
 
+	def _components(self) -> tuple[list[tuple[str, LLModel]], list[tuple[str, LLModel]]]:
+		pipeline = [
+			("meta_prompt", self.meta_prompt.llmodel),
+			("prompt_generator", self.prompt_generator.llmodel),
+		]
+		pipeline += [(f"analysis_{self._short_name(m.model_id)}", m)
+					 for m in self.result_analyzer.llmodels]
+		test = [(f"TEST_{self._short_name(k)}", v) for k, v in self.ll_models.items()]
+		return pipeline, test
+
 	def get_cost(self):
-		cost_dict = {
-			"meta_prompt": self.meta_prompt.llmodel.get_stats_avg().cost,
-			"prompt_generator": self.prompt_generator.llmodel.get_stats_avg().cost,
-		}
-		for m in self.result_analyzer.llmodels:
-			cost_dict[f"analysis_{self._short_name(m.model_id)}"] = m.get_stats_avg().cost
-		an_gen_total = sum(cost_dict.values())
-		test_total = 0.0
-		for k, v in  self.ll_models.items():
-			name = self._short_name(k)
-			model_cost = v.get_stats_avg().cost
-			cost_dict[f'TEST_{name}'] = model_cost
-			test_total += model_cost
-		cost_dict['TEST_TOTAL'] = test_total
-		cost_dict['Total Cost'] = test_total + an_gen_total
+		pipeline, test = self._components()
+		cost_dict = {label: model.get_stats_avg().cost for label, model in pipeline + test}
+		cost_dict['TEST_TOTAL'] = sum(cost_dict[label] for label, _ in test)
+		cost_dict['Total Cost'] = sum(cost_dict[label] for label, _ in pipeline + test)
 		return cost_dict
 
 	def get_latencies(self):
-		latency_dict = {
-			"meta_prompt": self.meta_prompt.llmodel.avg_latency,
-			"prompt_generator": self.prompt_generator.llmodel.avg_latency,
-		}
-		for m in self.result_analyzer.llmodels:
-			latency_dict[f"analysis_{self._short_name(m.model_id)}"] = m.avg_latency
-		for k, v in self.ll_models.items():
-			name = self._short_name(k)
-			latency_dict[f'TEST_{name}'] = v.avg_latency
-		return latency_dict
+		pipeline, test = self._components()
+		return {label: model.avg_latency for label, model in pipeline + test}
 
 	def display_stats(self):
 		costs = self.get_cost()
@@ -491,25 +482,16 @@ class PromptOptimizer:
 		display(df)
 
 	def _aggregate_stats(self, aggregator:callable) -> dict[str, RequestStats]:
-		stat_lists = {
-			"meta_prompt": self.meta_prompt.llmodel.stats_list,
-			"prompt_generator": self.prompt_generator.llmodel.stats_list,
-		}
-		for m in self.result_analyzer.llmodels:
-			stat_lists[f"analysis_{self._short_name(m.model_id)}"] = m.stats_list
-		test = []
-		for k, v in  self.ll_models.items():
-			name = self._short_name(k)
-			stat_lists[f'TEST_{name}'] = v.stats_list
-			test.append(aggregator(v.stats_list))
+		pipeline, test = self._components()
+		stat_lists = {label: model.stats_list for label, model in pipeline + test}
 
-		d = {k:aggregator(v) for k, v in stat_lists.items()}
-		d["TEST_TOTAL"] = aggregator(test)
-		d["TOTAL"] = aggregator([aggregator(v) for v in stat_lists.values()])
+		d = {k: aggregator(v) for k, v in stat_lists.items()}
+		total = aggregator(list(d.values()))
+		d["TEST_TOTAL"] = aggregator([aggregator(model.stats_list) for _, model in test])
+		d["TOTAL"] = total
 		d = {k: v for k, v in d.items() if v is not None}
 		for k, v in d.items():
-			if v is not None:
-				v.model = k
+			v.model = k
 		return d
 
 	def get_stats_avg(self):
