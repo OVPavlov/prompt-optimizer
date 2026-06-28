@@ -39,7 +39,7 @@ Now produce the three artifacts:
 
 **`<schema_design>`** — For each field: name in `snake_case`, type (`bool` or `float`), one sentence on what it measures, one sentence on what constitutes `True`/`1.0` and what constitutes `False`/`0.0`.
 
-**`<analysis_guidance>`** — For each field, describe what specific observable evidence in the output determines the score. Be concrete — reference the kind of content the analyzer should look for, not general principles. All schema fields must be scored on every evaluation. Do not suggest prompt improvements or speculate about causes — describe only what is present in the output.
+**`<analysis_guidance>`** — For each field, describe what specific observable evidence in the output determines the score. Be concrete — reference the kind of content the analyzer should look for, not general principles.
 
 **`<generation_guidance>`** — For each field, describe what a low score or False value implies about the prompt and what direction of change would address it, grounded in this specific task and schema.
 

@@ -16,7 +16,7 @@ If there's any failure in bools in any of the outputs, the rating for this bool 
 
 For <analysis>:
 - briefly describe what the outputs did and did not accomplish.
-- suggest prompt changes only if it's clear what could be improved.
+- Only when certain, identify which part of the prompt caused a failure.
 - analysis should be brief.
 
 For <rating>:

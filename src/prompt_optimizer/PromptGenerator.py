@@ -15,7 +15,7 @@ You are optimizing a prompt for an executor LLM performing the following task:
 {task_description}
 </task_description>
 
-The executor's output must conform to this format:
+How to address each rating dimension:
 
 {generation_guidance}
 

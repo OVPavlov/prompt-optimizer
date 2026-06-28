@@ -13,7 +13,7 @@
     <role id="analyzer" runs="per_model_per_iteration">
       Receives all (data, output) pairs for one model in one iteration.
       Produces analysis prose and a rating dict (bools + floats) with stable schema across all iterations.
-      Must not suggest prompt improvements — measurement only.
+      Measurement only; may point to a prompt cause when certain, but must not rewrite the prompt.
       Must produce one analysis and one rating from overall performance, not for each (data, output) pair.
     </role>
 
